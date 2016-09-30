@@ -24,11 +24,14 @@ def index():
 
 {% for entity in entities %}
 class {{entity.name}}(db.Model):
-    __tablename__ = 'TODO'
+    __tablename__ = '{{entity|dbname}}'
 
-    {% for attr in attributes %}
-    {{attr.name}} = db.Column()
+    {% for attr in entity|all("Attribute") %}
+    {{attr.name}} = db.Column('{{attr|dbname}}')
+    {%- endfor %}
 
-    {% endfor %}
+{% endfor %}
 
+{% for enum in enums %}
+Enum: {{enum.name}}
 {% endfor %}
