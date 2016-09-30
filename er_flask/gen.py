@@ -22,9 +22,9 @@ def render(root_path, template_path, context):
     folder.
 
     Args:
-        root_path (str): The root where templates should be searched first.
         template_path (str): Relative path to the template inside the root_path.
         context (dict)
+        root_path (str): The root where templates should be searched first.
     """
 
     # By default jinja2 is used but this can be changed by the user.
@@ -38,4 +38,5 @@ def render(root_path, template_path, context):
 
 # This object is registered in setup.py under entry point textx_gen
 gendesc = GenDesc(name="er_flask", lang="er",
+                  desc='flask generator for er language',
                   genconf=genconf_model, render=render)
