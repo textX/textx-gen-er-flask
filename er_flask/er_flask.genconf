@@ -1,3 +1,7 @@
+// Default generator param values
+composite_keys = false
+flask_admin = true
+
 Entity:
     for all Enum, Entity as enums, entities
         "flask.py" => "flaskapp.py"

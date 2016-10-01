@@ -6,6 +6,9 @@ from textx.model import all_of_type
 from er.lang import get_constraint
 
 
+PARAMETER_NAMES = ('flask_admin', 'composite_keys')
+
+
 def genconf_model():
     """
     Returns genconf model for 'er_flask' generator and 'er'
