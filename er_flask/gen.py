@@ -1,12 +1,13 @@
 import os
 from jinja2 import Environment, PackageLoader, FileSystemLoader, ChoiceLoader
 from txtools.gen import GenDesc
+from txtools.exceptions import TextXToolsException
 from textx.lang import get_language
 from textx.model import all_of_type
 from er.lang import get_constraint
 
 
-PARAMETER_NAMES = ('flask_admin', 'composite_keys')
+PARAM_NAMES = ('flask_admin', 'composite_keys')
 
 
 def genconf_model():
@@ -16,8 +17,16 @@ def genconf_model():
     """
     gc_meta = get_language("genconf")
     curr_dir = os.path.dirname(__file__)
-    return gc_meta.model_from_file(
+    gc_model = gc_meta.model_from_file(
         os.path.join(curr_dir, 'er_flask.genconf'))
+
+    # Check parameters
+    for p in gc_model.params:
+        if p.name not in PARAM_NAMES:
+            raise TextXToolsException('Undefined generator parameter "{}".'
+                                      .format(p.name))
+
+    return gc_model
 
 
 def dbname(obj):
@@ -68,4 +77,6 @@ def render(template_path, context, root_path=None):
 # This object is registered in setup.py under entry point textx_gen
 gendesc = GenDesc(name="er_flask", lang="er",
                   desc='flask generator for er language',
-                  genconf=genconf_model, render=render)
+                  genconf=genconf_model,
+                  render=render,
+                  param_names=PARAM_NAMES)
