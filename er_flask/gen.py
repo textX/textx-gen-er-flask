@@ -31,10 +31,10 @@ def genconf_model():
 
 def dbname(obj):
 
-    p = get_constraint(obj, 'dbname')
+    c = get_constraint(obj, 'dbname')
 
-    if p:
-        return p[0]
+    if c:
+        return c.parameters[0]
     else:
         # Construct default db name
         tname = obj.name[0].upper()
