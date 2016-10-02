@@ -1,0 +1,106 @@
+* Object->relational mapping
+** 1:1
+*** Non-containing
+- A references one B
+- Rel: FK in one of the tables which may be null and must be unique.
+
+- Multiplicity: If object ref is mandatory that side should be used for FK.
+  In that case FK must be non-null. If bidi ref is used than side which is
+  mandatory is the side for FK. If both sides are non-mandatory (e.g. lower
+  bound mult is 0) than any side can be used and the FK is null. If both
+  sides are mandatory any side can be used with FK non-null. Other side
+  constraint must be enforced on the app. level.
+
+- Problem: only one null record?
+- Example:
+      #+BEGIN_SRC
+      entity A {
+            ...
+            a: B
+      }
+      #+END_SRC
+
+*** Containing
+- A contains one B. Deleting A should delete B also, but deleting B is
+  possible without deleting A.
+- Rel: FK in the contained table (B) which is the same as PK.
+- Entity can be contained in only one other entity and only one reference to
+  some entity can be containing reference.
+
+- Example:
+      #+BEGIN_SRC
+      entity A {
+            ...
+            b+: B
+      #+END_SRC
+
+** 1:n
+*** Non-containing
+- A references possibly many Bs.
+- Rel: FK in B which is not unique and nullable.
+
+- Example:
+      #+BEGIN_SRC
+      entity A {
+            ...
+            b: B[*]
+      }
+      #+END_SRC
+
+*** Containing
+- A contains possibly many Bs.
+- Rel: FK in B table which is a part of PK (thus non-null). PK of B contains
+  additional colums which determine the element in the collection (usually an
+  ordinal).
+
+- Example:
+      #+BEGIN_SRC
+      entity A {
+            ...
+            b+: B[*]
+      }
+      #+END_SRC
+
+** n:n
+*** Non-containing
+- A references many Bs and each B references many As.
+- Rel: Additional table with two FKs pointing to each of the entity's tables.
+  Both FKs form additional table PK.
+
+- Example:
+      #+BEGIN_SRC
+      entity A {
+            ...
+            // This kind of relationships must be bidirectional to define
+            // multiplicity * on both ends.
+            b<->a: B[*]
+      }
+      entity B{
+            ...
+            a<->b: A[*]
+      }
+      #+END_SRC
+
+*** Containing
+- A contains many Bs and each B references many As.
+- Rel: The same as for non-containing but app must take care to delete all
+  containing objects when the container is deleted. When the relationship is
+  deleted, contained object is deleted also, i.e. it can't exists without its
+  container.
+
+- Example:
+      #+BEGIN_SRC
+      entity A {
+            ...
+            // This kind of relationships must be bidirectional to define
+            // multiplicity * on both ends.
+            // This side is the containing side.
+            b+<->a: B[*]
+      }
+      entity B{
+            ...
+            // Only one side can be containing. Entity A contains B entities.
+            a<->b: A[*]
+      }
+      #+END_SRC
+
