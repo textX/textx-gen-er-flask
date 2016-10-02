@@ -1,4 +1,4 @@
 # flask generator for ER textX language
 
-TODO: Write project description.
-
+This generator will produce source code for flask + SQLAlchemy from the ER
+models.
