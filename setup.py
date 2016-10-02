@@ -33,9 +33,7 @@ setup(
     url = URL,
     download_url = DOWNLOAD_URL,
     packages = ["er_flask"],
-    package_data={
-        'er_flask': ['templates/*', 'er_flask.genconf'],
-    },
+    include_package_data=True,
     install_requires = ["textx-tools", "textx-lang-er", "Jinja2"],
     keywords = "tools generator language DSL",
     entry_points={

@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+include er_flask/er_flask.genconf
+recursive-include er_flask/templates *
