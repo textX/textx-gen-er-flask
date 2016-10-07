@@ -71,7 +71,7 @@ def ent_elements(ent):
     # Find all referers and add columns and relationships.
     for e in children_of_type(model_root(ent), "Entity"):
         for attr in children_of_type(e, "Attribute"):
-            if attr.type.type is ent and attr.multiplicity.upper == '*':
+            if attr_type(attr) is ent and attr.multiplicity.upper == '*':
                 elements.extend(columns_target(attr))
 
     # Add columns and relationships from the direct attributes
@@ -135,11 +135,16 @@ def columns(attr):
 
 def columns_target(attr):
     """
-    Returns columns introduced by the other side attribute referencing this
-    attr entity using many reference (*).
+    Returns columns introduced to other side Entity by attr attribute whose
+    multiplicity is *.
     """
-    tattrs = pk_attrs(parent_of_type(attr, "Entity"))
-    pk = True
+    assert attr.multiplicity.upper == '*'
+    pent = parent_of_type(attr, "Entity")
+    tattrs = pk_attrs(pent)
+
+    # Containment ref. semantics is realized by putting columns in PK.
+    pk = attr.ref.containment if attr.ref else False
+    nullable = not pk
 
     # column will have FK constraint if it is single column
     fk = len(tattrs) == 1
@@ -149,24 +154,18 @@ def columns_target(attr):
     for a in tattrs:
         fk_target = ''
         if fk:
-            fk_target = '{}.{}'.format(attr_type(attr), dbname(a))
-        if attr.multiplicity.lower == 0:
-            nullable = True
-        if len(tattrs) == 1:
-            attr_name = attr.name
-            col_name = dbname(attr)
-        else:
-            attr_name = a.name
-            col_name = dbname(a)
+            fk_target = '{}.{}'.format(dbname(pent), dbname(a))
+        attr_name = a.name
+        col_name = dbname(a)
 
-            columns.append(
-                Column(name=attr_name,
-                       dbname=col_name,
-                       pk=pk,
-                       fk=fk,
-                       fk_target=fk_target,
-                       dbtype=dbtype(a),
-                       nullable=nullable))
+        columns.append(
+            Column(name=attr_name,
+                    dbname=col_name,
+                    pk=pk,
+                    fk=fk,
+                    fk_target=fk_target,
+                    dbtype=dbtype(a),
+                    nullable=nullable))
 
     return columns
 
