@@ -71,8 +71,9 @@ def ent_elements(ent):
     # Find all referers and add columns and relationships.
     for e in children_of_type(model_root(ent), "Entity"):
         for attr in children_of_type(e, "Attribute"):
-            if attr_type(attr) is ent and attr.multiplicity.upper == '*':
-                elements.extend(columns_target(attr))
+            if attr_type(attr) is ent:
+                for c in columns_target(attr):
+                    append_column(elements, c)
                 elements.append(rel_target(attr))
 
     # Add columns and relationships from the direct attributes
@@ -82,6 +83,17 @@ def ent_elements(ent):
             elements.append(rel(attr))
 
     return elements
+
+
+def append_column(l, column):
+    for c in l:
+        if c.name == column.name:
+            assert c.dbname == column.dbname
+            c.pk = c.pk or column.pk
+            c.fk = c.fk or column.fk
+            if not c.fk_target:
+                c.fk_target = column.fk_target
+            c.nullable = c.nullable and column.nullable
 
 
 def columns(attr):
@@ -142,7 +154,9 @@ def columns_target(attr):
     Returns columns introduced to other side Entity by attr attribute whose
     multiplicity is *.
     """
-    assert attr.multiplicity.upper == '*'
+    if attr.multiplicity.upper == '*':
+        return []
+
     pent = parent_of_type(attr, "Entity")
     tattrs = pk_attrs(pent)
 
