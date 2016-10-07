@@ -86,6 +86,10 @@ def ent_elements(ent):
 
 
 def append_column(l, column):
+    """
+    Appends column to the given list l. If the column already exists do some
+    sanity check and merge.
+    """
     for c in l:
         if c.name == column.name:
             assert c.dbname == column.dbname
