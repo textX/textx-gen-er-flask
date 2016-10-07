@@ -54,7 +54,7 @@ def all(obj, type_name):
 
 # Structure used to capture relational meta-data
 Column = namedtuple('Column', 'name dbname pk fk fk_target dbtype nullable')
-Relationship = namedtuple('Relationship', 'name target_class fk_columns')
+Relationship = namedtuple('Relationship', 'name target_class fk_columns backref')
 ForeignKeyConstraint = namedtuple('ForeignKeyConstraint',
                                   'from_col_names target_table to_col_names')
 
@@ -73,13 +73,13 @@ def ent_elements(ent):
         for attr in children_of_type(e, "Attribute"):
             if attr_type(attr) is ent and attr.multiplicity.upper == '*':
                 elements.extend(columns_target(attr))
+                elements.append(rel_target(attr))
 
     # Add columns and relationships from the direct attributes
     for attr in children_of_type(ent, "Attribute"):
-        # 'Many' attributes will have columns in target entity table.
-        if attr.multiplicity.upper != '*':
-            elements.extend(columns(attr))
-        # elements.extend(rel(attr))
+        elements.extend(columns(attr))
+        if is_entity_ref(attr):
+            elements.append(rel(attr))
 
     return elements
 
@@ -88,6 +88,10 @@ def columns(attr):
     """
     Returns columns introduced by the given ER attribute.
     """
+
+    # 'Many' attributes will have columns in target entity table.
+    if attr.multiplicity.upper == '*':
+        return []
 
     if is_entity_ref(attr):
         tattrs = pk_attrs(attr_type(attr))
@@ -114,7 +118,7 @@ def columns(attr):
         fk_target = ''
         if fk:
             fk_target = '{}.{}'.format(dbname(attr_type(attr)), dbname(a))
-            attr_name = attr.name
+            attr_name = attr.name + '_id'
             col_name = dbname(attr)
         else:
             attr_name = a.name
@@ -160,20 +164,34 @@ def columns_target(attr):
 
         columns.append(
             Column(name=attr_name,
-                    dbname=col_name,
-                    pk=pk,
-                    fk=fk,
-                    fk_target=fk_target,
-                    dbtype=dbtype(a),
-                    nullable=nullable))
+                   dbname=col_name,
+                   pk=pk,
+                   fk=fk,
+                   fk_target=fk_target,
+                   dbtype=dbtype(a),
+                   nullable=nullable))
 
     return columns
+
+
+def back_ref(attr):
+    """
+    Returns the name of other side of bidirectional relationship.
+    """
+    if attr.ref and attr.ref.bidir:
+        return attr.ref.other_side
+    else:
+        return parent_of_type(attr, "Entity").name.lower()
 
 
 def rel(attr):
     """
     Returns relationship for the given ER attribute.
     """
+    return Relationship(name=attr.name,
+                        target_class=attr_type(attr).name,
+                        fk_columns=columns(attr),
+                        backref=back_ref(attr))
 
 
 def rel_target(attr):
@@ -181,6 +199,10 @@ def rel_target(attr):
     Returns relationship for the other side attribute referencing this attr
     entity.
     """
+    return Relationship(name=back_ref(attr),
+                        target_class=parent_of_type(attr, "Entity").name,
+                        fk_columns=columns_target(attr),
+                        backref=attr.name)
 
 
 def pk_attrs(ent):

@@ -42,6 +42,8 @@ class {{entity.name}}(db.Model):
                               {%- if elem.pk %}, primary_key=True{% endif %}
                               {%- if elem.nullable %}, nullable=True{% endif %})
     {%- else %}
+    {{elem.name}} = relationship('{{elem.target_class}}'{% if elem.fk_columns %}, foreign_keys=[
+        {{- elem.fk_columns|map(attribute='name')|join(', ')}}]{% endif %}, back_populates='{{elem.backref}}')
     {%- endif %}
     {%- endfor %}
 
