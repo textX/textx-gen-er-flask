@@ -5,8 +5,7 @@ from txtools.gen import GenDesc
 from txtools.exceptions import TextXToolsException
 from textx.lang import get_language
 from textx.model import children_of_type, model_root, parent_of_type
-from er.lang import get_constraint, is_entity_ref, is_enum_ref,\
-    attr_type, meta_name
+from er.lang import get_constraint, is_entity_ref, is_enum_ref, attr_type
 
 
 PARAM_NAMES = ('flask_admin', 'composite_keys')
@@ -45,11 +44,6 @@ def dbname(obj):
                 tname += "_"
             tname += letter.upper()
         return tname
-
-
-def all(obj, type_name):
-    lang = get_language("er")
-    return all_of_type(lang, obj, type_name)
 
 
 # Structure used to capture relational meta-data
