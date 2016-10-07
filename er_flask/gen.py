@@ -48,7 +48,8 @@ def dbname(obj):
 
 # Structure used to capture relational meta-data
 Column = namedtuple('Column', 'name dbname pk fk fk_target dbtype nullable')
-Relationship = namedtuple('Relationship', 'name target_class fk_columns backref')
+Relationship = namedtuple('Relationship',
+                          'name target_class fk_columns backref')
 ForeignKeyConstraint = namedtuple('ForeignKeyConstraint',
                                   'from_col_names target_table to_col_names')
 
@@ -72,7 +73,8 @@ def ent_elements(ent):
 
     # Add columns and relationships from the direct attributes
     for attr in children_of_type(ent, "Attribute"):
-        elements.extend(columns(attr))
+        for c in columns(attr):
+            append_column(elements, c)
         if is_entity_ref(attr):
             elements.append(rel(attr))
 
@@ -84,14 +86,22 @@ def append_column(l, column):
     Appends column to the given list l. If the column already exists do some
     sanity check and merge.
     """
-    for c in l:
+    for idx, c in enumerate(l):
         if c.name == column.name:
             assert c.dbname == column.dbname
-            c.pk = c.pk or column.pk
-            c.fk = c.fk or column.fk
-            if not c.fk_target:
-                c.fk_target = column.fk_target
-            c.nullable = c.nullable and column.nullable
+            assert c.dbtype == column.dbtype
+            if c.fk and column.fk:
+                assert c.fk_target == column.fk_target
+            l[idx] = Column(name=c.name,
+                            dbname=c.dbname,
+                            pk=c.pk or column.pk,
+                            fk=c.fk or column.fk,
+                            fk_target=c.fk_target or column.fk_target,
+                            dbtype=c.dbtype,
+                            nullable=c.nullable and column.nullable)
+            break
+    else:
+        l.append(column)
 
 
 def columns(attr):
@@ -152,9 +162,6 @@ def columns_target(attr):
     Returns columns introduced to other side Entity by attr attribute whose
     multiplicity is *.
     """
-    if attr.multiplicity.upper == '*':
-        return []
-
     pent = parent_of_type(attr, "Entity")
     tattrs = pk_attrs(pent)
 
@@ -213,7 +220,7 @@ def rel_target(attr):
     """
     return Relationship(name=back_ref(attr),
                         target_class=parent_of_type(attr, "Entity").name,
-                        fk_columns=columns_target(attr),
+                        fk_columns=[],
                         backref=attr.name)
 
 
