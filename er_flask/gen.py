@@ -49,9 +49,9 @@ def dbname(obj):
 # Structure used to capture relational meta-data
 Column = namedtuple('Column', 'name dbname pk fk fk_target dbtype nullable')
 Relationship = namedtuple('Relationship',
-                          'name target_class fk_columns backref')
+                          'name target_ent fk_columns backref')
 ForeignKeyConstraint = namedtuple('ForeignKeyConstraint',
-                                  'from_col_names target_table to_col_names')
+                                  'from_cols target_ent to_cols')
 
 
 def ent_elements(ent):
@@ -63,7 +63,7 @@ def ent_elements(ent):
 
     elements = []
 
-    # Find all referers and add columns and relationships.
+    # Find all referrers and add columns and relationships.
     for e in children_of_type(model_root(ent), "Entity"):
         for attr in children_of_type(e, "Attribute"):
             if attr_type(attr) is ent:
@@ -169,7 +169,7 @@ def columns_target(attr):
     pk = attr.ref.containment if attr.ref else False
     nullable = not pk
 
-    # column will have FK constraint if it is single column
+    # column will have FK constraint if it is a single column
     fk = len(tattrs) == 1
 
     # Columns
@@ -208,7 +208,7 @@ def rel(attr):
     Returns relationship for the given ER attribute.
     """
     return Relationship(name=attr.name,
-                        target_class=attr_type(attr).name,
+                        target_ent=attr_type(attr),
                         fk_columns=columns(attr),
                         backref=back_ref(attr))
 
@@ -219,8 +219,8 @@ def rel_target(attr):
     entity.
     """
     return Relationship(name=back_ref(attr),
-                        target_class=parent_of_type(attr, "Entity").name,
-                        fk_columns=[],
+                        target_ent=parent_of_type(attr, "Entity"),
+                        fk_columns=columns_target(attr),
                         backref=attr.name)
 
 
@@ -235,7 +235,7 @@ def pk_attrs(ent):
             if not is_entity_ref(a):
                 attrs.append(a)
             else:
-                attrs.extend(pk_attrs(a.type.type))
+                attrs.extend(pk_attrs(attr_type(a)))
     return attrs
 
 
