@@ -1,7 +1,9 @@
 import os
 from flask import Flask
+{% if flask_admin -%}
 from flask_admin.contrib.sqla import ModelView
 from flask_admin import Admin
+{% endif -%}
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 import enum
@@ -42,14 +44,14 @@ class {{entity.name}}(db.Model):
                               {%- if elem.pk %}, primary_key=True{% endif %}
                               {%- if elem.nullable %}, nullable=True{% endif %})
     {%- else %}
-    {{elem.name}} = relationship('{{elem.target_class}}'{% if elem.fk_columns %}, foreign_keys=[
+    {{elem.name}} = relationship('{{elem.target_ent.name}}'{% if elem.fk_columns %}, foreign_keys=[
         {{- elem.fk_columns|map(attribute='name')|join(', ')}}]{% endif %}, back_populates='{{elem.backref}}')
     {%- endif %}
     {%- endfor %}
 
 {% endfor %}
 
-
+{% if flask_admin -%}
 # Flask Admin views
 admin = Admin(app, name='{{project_name}}', template_mode='bootstrap3')
 
@@ -58,9 +60,9 @@ class {{entity.name}}View(ModelView):
     column_display_pk = True
     form_columns = (
         {%- for elem in entity|ent_elements %}
-        '{{elem.name}}'{% if not loop.last %}, {% endif %}
+        '{{elem.name}}'{% if not loop.last %},{% endif %}
         {%- endfor %}
     )
 admin.add_view({{entity.name}}View({{entity.name}}, db.session))
 {% endfor %}
-
+{% endif -%}

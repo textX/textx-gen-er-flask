@@ -47,11 +47,28 @@ def dbname(obj):
 
 
 # Structure used to capture relational meta-data
-Column = namedtuple('Column', 'name dbname pk fk fk_target dbtype nullable')
+# Column:
+#   ent - parent Entity
+#   from_attr - introduced based on attribute
+#   pk - is part of primary key
+#   fk - is a single-column foreign key
+#   fk_target - Table.column spec. for the target. Used if fk.
+#   dbtype - sqlalchemy db type
+#   nullable - is nullable
+Column = namedtuple('Column',
+                    'name dbname ent from_attr pk fk fk_target dbtype nullable')
+# Relationship:
+#   name - the name of the class attribute
+#   target_ent - target Entity object from the model
+#   fk_columns - a list of columns used to implement this relationship
+#   backref - the name of the other end class attribute
 Relationship = namedtuple('Relationship',
                           'name target_ent fk_columns backref')
+# ForeignKeyConstraint:
+#   fk_columns - a list of columns used to implement this constraint
+#   targe_ent - target Entity object from the model
 ForeignKeyConstraint = namedtuple('ForeignKeyConstraint',
-                                  'from_cols target_ent to_cols')
+                                  'fk_columns target_ent')
 
 
 def ent_elements(ent):
@@ -64,126 +81,116 @@ def ent_elements(ent):
     elements = []
 
     # Find all referrers and add columns and relationships.
+    print("Processing table ", ent.name)
     for e in children_of_type(model_root(ent), "Entity"):
+        if e is ent:
+            continue
+        print("\tAnalysing entity", e.name)
         for attr in children_of_type(e, "Attribute"):
             if attr_type(attr) is ent:
-                for c in columns_target(attr):
-                    append_column(elements, c)
-                elements.append(rel_target(attr))
+                print("\t\tAttribute", attr.name)
+                print("\t\t\t{}".format([a.name for a in columns(ent, attr)]))
+                for c in columns(ent, attr):
+                    append_column(elements, c, ent)
+                elements.append(rel(ent, attr))
 
     # Add columns and relationships from the direct attributes
     for attr in children_of_type(ent, "Attribute"):
-        for c in columns(attr):
-            append_column(elements, c)
+        for c in columns(ent, attr):
+            append_column(elements, c, ent)
         if is_entity_ref(attr):
-            elements.append(rel(attr))
+            elements.append(rel(ent, attr))
+
+    # Foreign key constraint exists if there is relationship over more
+    # than one column.
+    # fk_constraints = []
+    # for e in elements:
+    #     if type(e) is Relationship:
+    #         if len(e.fk_columns) > 1:
+    #             fk_constraints.append(
+    #                 ForeignKeyConstraint(
+    #                     fk_columns=e.fk_columns,
+    #                     target_ent=e.target_ent))
+    # elements.extend(fk_constraints)
 
     return elements
 
 
-def append_column(l, column):
+def append_column(l, column, ent):
     """
     Appends column to the given list l. If the column already exists do some
     sanity check and merge.
     """
     for idx, c in enumerate(l):
-        if c.name == column.name:
-            assert c.dbname == column.dbname
-            assert c.dbtype == column.dbtype
-            if c.fk and column.fk:
-                assert c.fk_target == column.fk_target
-            l[idx] = Column(name=c.name,
-                            dbname=c.dbname,
-                            pk=c.pk or column.pk,
-                            fk=c.fk or column.fk,
-                            fk_target=c.fk_target or column.fk_target,
-                            dbtype=c.dbtype,
-                            nullable=c.nullable and column.nullable)
-            break
+        if type(c) is Column:
+            assert c.ent is column.ent
+            assert c.name != column.name, "{} already introduced in {} by {}"\
+                .format(c.name, ent.name, c.ent.name)
+            if c.name == column.name:
+                assert c.dbname == column.dbname
+                assert c.dbtype == column.dbtype
+                if c.fk and column.fk:
+                    assert c.fk_target == column.fk_target
+                l[idx] = Column(name=c.name,
+                                dbname=c.dbname,
+                                ent=c.ent,
+                                pk=c.pk or column.pk,
+                                fk=c.fk or column.fk,
+                                fk_target=c.fk_target or column.fk_target,
+                                dbtype=c.dbtype,
+                                nullable=c.nullable and column.nullable)
+                break
     else:
         l.append(column)
 
 
-def columns(attr):
+def columns(ent,  attr):
     """
-    Returns columns introduced by the given ER attribute.
+    Returns columns introduced on the given Entity by the given ER attribute.
     """
 
-    # 'Many' attributes will have columns in target entity table.
-    if attr.multiplicity.upper == '*':
-        return []
+    pent = parent_of_type(attr, "Entity")
+
+    assert pent is ent or (is_entity_ref(attr) and attr_type(attr) is ent)
+
+    other_side = pent is not ent
 
     if is_entity_ref(attr):
-        tattrs = pk_attrs(attr_type(attr))
+        if not other_side:
+            # 'Many' attributes will have columns in target entity table.
+            if attr.multiplicity.upper == '*':
+                return []
+            target_ent = attr_type(attr)
+        else:
+            # Other side attr with non-many mult. doesn't create any columns.
+            if attr.multiplicity.upper == 1:
+                return []
+            target_ent = pent
+        tattrs = pk_attrs(target_ent)
         fk = len(tattrs) == 1
     else:
         tattrs = [attr]
         fk = False
     pk = attr.id
 
-    # In case of multiple references to the same Entity we need unique
-    # column names. Using counter. TODO.
-    # counter = 1
-    # referenced_entity_counter = {}
-    # if clsname == 'Entity':
-    #     if ent.name not in referenced_entity_counter:
-    #         referenced_entity_counter[ent.name] = 1
-    #     else:
-    #         referenced_entity_counter[ent.name] += 1
-    #         counter = referenced_entity_counter[ent.name]
-
-    # Columns
     columns = []
     for a in tattrs:
-        fk_target = ''
         if fk:
-            fk_target = '{}.{}'.format(dbname(attr_type(attr)), dbname(a))
-            attr_name = attr.name + '_id'
-            col_name = dbname(attr)
+            col_name = attr.name + '_id'
         else:
-            attr_name = a.name
-            col_name = dbname(a)
+            col_name = a.name
+        db_col_name = dbname(a)
+        if is_entity_ref(attr):
+            fk_target = '{}.{}'.format(dbname(target_ent), db_col_name)
+        else:
+            fk_target = ''
 
         nullable = attr.multiplicity.lower == 0
         columns.append(
-            Column(name=attr_name,
-                   dbname=col_name,
-                   pk=pk,
-                   fk=fk,
-                   fk_target=fk_target,
-                   dbtype=dbtype(a),
-                   nullable=nullable))
-
-    return columns
-
-
-def columns_target(attr):
-    """
-    Returns columns introduced to other side Entity by attr attribute whose
-    multiplicity is *.
-    """
-    pent = parent_of_type(attr, "Entity")
-    tattrs = pk_attrs(pent)
-
-    # Containment ref. semantics is realized by putting columns in PK.
-    pk = attr.ref.containment if attr.ref else False
-    nullable = not pk
-
-    # column will have FK constraint if it is a single column
-    fk = len(tattrs) == 1
-
-    # Columns
-    columns = []
-    for a in tattrs:
-        fk_target = ''
-        if fk:
-            fk_target = '{}.{}'.format(dbname(pent), dbname(a))
-        attr_name = a.name
-        col_name = dbname(a)
-
-        columns.append(
-            Column(name=attr_name,
-                   dbname=col_name,
+            Column(name=col_name,
+                   dbname=db_col_name,
+                   ent=ent,
+                   from_attr=attr,
                    pk=pk,
                    fk=fk,
                    fk_target=fk_target,
@@ -203,25 +210,23 @@ def back_ref(attr):
         return parent_of_type(attr, "Entity").name.lower()
 
 
-def rel(attr):
+def rel(ent, attr):
     """
     Returns relationship for the given ER attribute.
     """
-    return Relationship(name=attr.name,
-                        target_ent=attr_type(attr),
-                        fk_columns=columns(attr),
-                        backref=back_ref(attr))
+    pent = parent_of_type(attr, "Entity")
+    assert pent is ent or attr_type(attr) is ent
 
-
-def rel_target(attr):
-    """
-    Returns relationship for the other side attribute referencing this attr
-    entity.
-    """
-    return Relationship(name=back_ref(attr),
-                        target_ent=parent_of_type(attr, "Entity"),
-                        fk_columns=columns_target(attr),
-                        backref=attr.name)
+    if pent is ent:
+        return Relationship(name=attr.name,
+                            target_ent=attr_type(attr),
+                            fk_columns=columns(ent, attr),
+                            backref=back_ref(attr))
+    else:
+        return Relationship(name=back_ref(attr),
+                            target_ent=pent,
+                            fk_columns=columns(ent, attr),
+                            backref=attr.name)
 
 
 def pk_attrs(ent):
