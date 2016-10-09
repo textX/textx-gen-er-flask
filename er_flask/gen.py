@@ -8,7 +8,7 @@ from textx.model import children_of_type, model_root, parent_of_type
 from er.lang import get_constraint, is_entity_ref, is_enum_ref, attr_type
 
 
-PARAM_NAMES = ('flask_admin', 'composite_keys')
+PARAM_NAMES = ('flask_admin', 'project_name')
 
 
 def genconf_model():
