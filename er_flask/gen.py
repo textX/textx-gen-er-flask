@@ -2,13 +2,10 @@ import os
 from collections import namedtuple
 from jinja2 import Environment, PackageLoader, FileSystemLoader, ChoiceLoader
 from txtools.gen import GenDesc
-from txtools.exceptions import TextXToolsException
+from txtools.exceptions import ValidationError
 from textx.lang import get_language
 from textx.model import children_of_type, model_root, parent_of_type
 from er.lang import get_constraint, is_entity_ref, is_enum_ref, attr_type
-
-
-PARAM_NAMES = ('flask_admin', 'project_name')
 
 
 def genconf_model():
@@ -20,12 +17,6 @@ def genconf_model():
     curr_dir = os.path.dirname(__file__)
     gc_model = gc_meta.model_from_file(
         os.path.join(curr_dir, 'er_flask.genconf'))
-
-    # Check parameters
-    for p in gc_model.params:
-        if p.name not in PARAM_NAMES:
-            raise TextXToolsException('Undefined generator parameter "{}".'
-                                      .format(p.name))
 
     return gc_model
 

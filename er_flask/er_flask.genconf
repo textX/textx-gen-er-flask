@@ -1,5 +1,6 @@
 // Default generator param values
 flask_admin = true
+project_name = must_change
 
 Entity:
     for all Enum, Entity as enums, entities
