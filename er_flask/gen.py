@@ -260,6 +260,25 @@ def dbtype(attr):
             return 'db.Float({}, asdecimal=True)'.format(attr.type.precision_x)
 
 
+def validate(model):
+    """
+    Generator specific validation of ER models.
+    Throws ValidationError if there is an error in the model.
+    """
+
+    for ent in children_of_type(model, "Entity"):
+        without_dbname = set()
+        for attr in children_of_type(ent, "Attribute"):
+            if is_entity_ref(attr) and get_constraint(attr, "dbname") is None:
+                target_entity_name = attr_type(attr).name
+                if target_entity_name in without_dbname:
+                    raise ValidationError(
+                        "While validating '{}.{}'. Multiple references to the "
+                        "same target Entity '{}' without 'dbname' definition."
+                        .format(ent.name, attr.name, target_entity_name))
+                without_dbname.add(target_entity_name)
+
+
 def render(template_path, context, root_path=None):
     """
     Returns rendered template. By default search for template at the given
@@ -289,4 +308,4 @@ gendesc = GenDesc(name="er_flask", lang="er",
                   desc='flask generator for er language',
                   genconf=genconf_model,
                   render=render,
-                  param_names=PARAM_NAMES)
+                  validate=validate)
