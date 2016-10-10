@@ -21,20 +21,43 @@ def genconf_model():
     return gc_model
 
 
-def dbname(obj):
+def default_dbname(er_name):
+    tname = er_name[0].upper()
+    for letter in er_name[1:]:
+        if letter.isupper():
+            tname += "_"
+        tname += letter.upper()
+    return tname
 
-    c = get_constraint(obj, 'dbname')
+
+def dbname(ent):
+
+    c = get_constraint(ent, 'dbname')
 
     if c:
         return c.parameters[0]
     else:
         # Construct default db name
-        tname = obj.name[0].upper()
-        for letter in obj.name[1:]:
-            if letter.isupper():
-                tname += "_"
-            tname += letter.upper()
-        return tname
+        return default_dbname(ent.name)
+
+
+def dbcols(attr, idx=0):
+
+    c = get_constraint(attr, 'dbcols')
+
+    if c:
+        return c.parameters[idx]
+    else:
+        # Construct default db name
+        return default_dbname(attr.name)
+
+
+def colname(attr, idx=0):
+
+    c = get_constraint(attr, 'dbcols')
+
+    if c:
+        return c.parameters[idx]
 
 
 # Structure used to capture relational meta-data
@@ -72,67 +95,29 @@ def ent_elements(ent):
     elements = []
 
     # Find all referrers and add columns and relationships.
-    print("Processing table ", ent.name)
     for e in children_of_type(model_root(ent), "Entity"):
         if e is ent:
             continue
-        print("\tAnalysing entity", e.name)
         for attr in children_of_type(e, "Attribute"):
             if attr_type(attr) is ent:
-                print("\t\tAttribute", attr.name)
-                print("\t\t\t{}".format([a.name for a in columns(ent, attr)]))
-                for c in columns(ent, attr):
-                    append_column(elements, c, ent)
+                elements.extend(columns(ent, attr))
                 elements.append(rel(ent, attr))
 
     # Add columns and relationships from the direct attributes
     for attr in children_of_type(ent, "Attribute"):
-        for c in columns(ent, attr):
-            append_column(elements, c, ent)
+        elements.extend(columns(ent, attr))
         if is_entity_ref(attr):
             elements.append(rel(ent, attr))
 
-    # Foreign key constraint exists if there is relationship over more
-    # than one column.
-    # fk_constraints = []
-    # for e in elements:
-    #     if type(e) is Relationship:
-    #         if len(e.fk_columns) > 1:
-    #             fk_constraints.append(
-    #                 ForeignKeyConstraint(
-    #                     fk_columns=e.fk_columns,
-    #                     target_ent=e.target_ent))
-    # elements.extend(fk_constraints)
+    # Check that elements names are unique
+    enames = set()
+    for e in elements:
+        if e.name in enames:
+            raise ValidationError('In "{}" class. Attribute "{}" exists.'
+                                  .format(ent.name, e.name))
+        enames.add(e.name)
 
     return elements
-
-
-def append_column(l, column, ent):
-    """
-    Appends column to the given list l. If the column already exists do some
-    sanity check and merge.
-    """
-    for idx, c in enumerate(l):
-        if type(c) is Column:
-            assert c.ent is column.ent
-            assert c.name != column.name, "{} already introduced in {} by {}"\
-                .format(c.name, ent.name, c.ent.name)
-            if c.name == column.name:
-                assert c.dbname == column.dbname
-                assert c.dbtype == column.dbtype
-                if c.fk and column.fk:
-                    assert c.fk_target == column.fk_target
-                l[idx] = Column(name=c.name,
-                                dbname=c.dbname,
-                                ent=c.ent,
-                                pk=c.pk or column.pk,
-                                fk=c.fk or column.fk,
-                                fk_target=c.fk_target or column.fk_target,
-                                dbtype=c.dbtype,
-                                nullable=c.nullable and column.nullable)
-                break
-    else:
-        l.append(column)
 
 
 def columns(ent,  attr):
@@ -165,14 +150,24 @@ def columns(ent,  attr):
     pk = attr.id
 
     columns = []
-    for a in tattrs:
+    for idx, a in enumerate(tattrs):
         if fk:
-            col_name = attr.name + '_id'
+            col_name = colname(attr)
+            if not col_name:
+                col_name = "{}_id".format(attr.name)
         else:
-            col_name = a.name
-        db_col_name = dbname(a)
+            try:
+                col_name = colname(attr, idx)
+            except IndexError:
+                raise ValidationError('Expected {} parameters in dbcols for '
+                                      '{}.{}'.format(len(tattrs), ent.name,
+                                                     attr.name))
+            if not col_name:
+                col_name = a.name
+        db_col_name = default_dbname(col_name)
         if is_entity_ref(attr):
-            fk_target = '{}.{}'.format(dbname(target_ent), db_col_name)
+            fk_target = '{}.{}'.format(dbname(target_ent),
+                                       default_dbname(a.name))
         else:
             fk_target = ''
 
@@ -267,7 +262,7 @@ def validate(model):
     """
 
     for ent in children_of_type(model, "Entity"):
-        without_dbname = set()
+        without_dbcols = set()
         dbcols = set()
         for attr in children_of_type(ent, "Attribute"):
             if attr.name in dbcols:
@@ -276,12 +271,13 @@ def validate(model):
 
             if is_entity_ref(attr) and get_constraint(attr, "dbcols") is None:
                 target_entity_name = attr_type(attr).name
-                if target_entity_name in without_dbname:
+                if target_entity_name in without_dbcols and \
+                        len(pk_attrs(attr_type(attr))) > 1:
                     raise ValidationError(
                         "While validating '{}.{}'. Multiple references to the "
                         "same target Entity '{}' without 'dbcols' definition."
                         .format(ent.name, attr.name, target_entity_name))
-                without_dbname.add(target_entity_name)
+                without_dbcols.add(target_entity_name)
 
             dbcols_constr = get_constraint(attr, "dbcols")
             if dbcols_constr:
@@ -291,7 +287,6 @@ def validate(model):
                             'In "{}.{}" dbcols. "{}" already defined.'
                             .format(ent.name, attr.name, p))
                     dbcols.add(p)
-
 
 
 def render(template_path, context, root_path=None):
@@ -319,7 +314,7 @@ def render(template_path, context, root_path=None):
 
 
 # This object is registered in setup.py under entry point textx_gen
-gendesc = GenDesc(name="er_flask", lang="er",
+gendesc = GenDesc(name='er_flask', lang='er',
                   desc='flask generator for er language',
                   genconf=genconf_model,
                   render=render,
