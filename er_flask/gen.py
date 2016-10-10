@@ -268,15 +268,30 @@ def validate(model):
 
     for ent in children_of_type(model, "Entity"):
         without_dbname = set()
+        dbcols = set()
         for attr in children_of_type(ent, "Attribute"):
-            if is_entity_ref(attr) and get_constraint(attr, "dbname") is None:
+            if attr.name in dbcols:
+                raise ValidationError("In '{}.{}'. '{}' already defined."
+                                      .format(ent.name, attr.name, attr.name))
+
+            if is_entity_ref(attr) and get_constraint(attr, "dbcols") is None:
                 target_entity_name = attr_type(attr).name
                 if target_entity_name in without_dbname:
                     raise ValidationError(
                         "While validating '{}.{}'. Multiple references to the "
-                        "same target Entity '{}' without 'dbname' definition."
+                        "same target Entity '{}' without 'dbcols' definition."
                         .format(ent.name, attr.name, target_entity_name))
                 without_dbname.add(target_entity_name)
+
+            dbcols_constr = get_constraint(attr, "dbcols")
+            if dbcols_constr:
+                for p in dbcols_constr.parameters:
+                    if p in dbcols:
+                        raise ValidationError(
+                            'In "{}.{}" dbcols. "{}" already defined.'
+                            .format(ent.name, attr.name, p))
+                    dbcols.add(p)
+
 
 
 def render(template_path, context, root_path=None):
