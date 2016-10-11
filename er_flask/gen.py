@@ -22,6 +22,10 @@ def genconf_model():
 
 
 def default_dbname(er_name):
+    """
+    Returns default database name from ER name.
+    """
+
     tname = er_name[0].upper()
     for letter in er_name[1:]:
         if letter.isupper():
@@ -31,6 +35,10 @@ def default_dbname(er_name):
 
 
 def dbname(ent):
+    """
+    Get Entity database name, i.e. table name.
+    Query dbname constraint or construct default.
+    """
 
     c = get_constraint(ent, 'dbname')
 
@@ -42,6 +50,10 @@ def dbname(ent):
 
 
 def dbcols(attr, idx=0):
+    """
+    Get idx column name for ER attribute attr.
+    Query dbcols constraint or construct default.
+    """
 
     c = get_constraint(attr, 'dbcols')
 
@@ -80,9 +92,8 @@ Relationship = namedtuple('Relationship',
                           'name target_ent fk_columns backref')
 # ForeignKeyConstraint:
 #   fk_columns - a list of columns used to implement this constraint
-#   targe_ent - target Entity object from the model
 ForeignKeyConstraint = namedtuple('ForeignKeyConstraint',
-                                  'fk_columns target_ent')
+                                  'name fk_columns')
 
 
 def ent_elements(ent):
@@ -93,21 +104,34 @@ def ent_elements(ent):
     """
 
     elements = []
+    fk_constraints = []
 
-    # Find all referrers and add columns and relationships.
+    # Add columns and relationships introduced by external references.
     for e in children_of_type(model_root(ent), "Entity"):
         if e is ent:
             continue
         for attr in children_of_type(e, "Attribute"):
             if attr_type(attr) is ent:
-                elements.extend(columns(ent, attr))
+                cols = columns(ent, attr)
+                elements.extend(cols)
+                if len(cols) > 1:
+                    fk_constraints.append(
+                        ForeignKeyConstraint(
+                            name="fk_{}_{}".format(dbname(ent), attr.name),
+                            fk_columns = cols))
                 elements.append(rel(ent, attr))
 
     # Add columns and relationships from the direct attributes
     for attr in children_of_type(ent, "Attribute"):
-        elements.extend(columns(ent, attr))
+        cols = columns(ent, attr)
+        elements.extend(cols)
         if is_entity_ref(attr):
             elements.append(rel(ent, attr))
+            if len(cols) > 1:
+                fk_constraints.append(
+                    ForeignKeyConstraint(
+                        name="fk_{}_{}".format(dbname(ent), attr.name),
+                        fk_columns = cols))
 
     # Check that elements names are unique
     enames = set()
@@ -117,7 +141,7 @@ def ent_elements(ent):
                                   .format(ent.name, e.name))
         enames.add(e.name)
 
-    return elements
+    return elements, fk_constraints
 
 
 def columns(ent,  attr):
@@ -255,6 +279,13 @@ def dbtype(attr):
             return 'db.Float({}, asdecimal=True)'.format(attr.type.precision_x)
 
 
+def quote(s):
+    """
+    Jinja filter to quote string.
+    """
+    return "'{}'".format(s)
+
+
 def validate(model):
     """
     Generator specific validation of ER models.
@@ -308,6 +339,7 @@ def render(template_path, context, root_path=None):
     ]))
 
     env.filters['dbname'] = dbname
+    env.filters['quote'] = quote
     env.filters['ent_elements'] = ent_elements
 
     return env.get_template(template_path).render(**context)

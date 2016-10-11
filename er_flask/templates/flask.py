@@ -37,7 +37,8 @@ class {{enum.name}}(enum.Enum):
 class {{entity.name}}(db.Model):
     __tablename__ = '{{entity|dbname}}'
 
-    {% for elem in entity|ent_elements %}
+    {% set elements, fk_constraints = entity|ent_elements %}
+    {% for elem in elements %}
     {%- if elem.__class__.__name__ == 'Column' %}
     {{elem.name}} = db.Column('{{elem.dbname}}', {{elem.dbtype}}
                               {%- if elem.fk %}, db.ForeignKey('{{elem.fk_target}}'){% endif %}
@@ -48,6 +49,16 @@ class {{entity.name}}(db.Model):
         {{- elem.fk_columns|map(attribute='name')|join(', ')}}]{% endif %}, back_populates='{{elem.backref}}')
     {%- endif %}
     {%- endfor %}
+
+    {% if fk_constraints %}
+    __table_args__ = (
+        {%- for fkc in fk_constraints %}
+        db.ForeignKeyConstraint([{{fkc.fk_columns|map(attribute='dbname')|map('quote')|join(", ")}}],
+                                [{{fkc.fk_columns|map(attribute='fk_target')|map('quote')|join(", ")}}],
+                                name='{{fkc.name}}'),
+        {%- endfor %}
+    )
+    {% endif %}
 
 {% endfor %}
 
