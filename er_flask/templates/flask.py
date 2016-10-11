@@ -36,8 +36,7 @@ class {{enum.name}}(enum.Enum):
 {% for entity in entities %}
 class {{entity.name}}(db.Model):
     __tablename__ = '{{entity|dbname}}'
-
-    {% set elements, fk_constraints = entity|ent_elements %}
+    {% set elements, fk_constraints = entity|ent_elements -%}
     {% for elem in elements %}
     {%- if elem.__class__.__name__ == 'Column' %}
     {{elem.name}} = db.Column('{{elem.dbname}}', {{elem.dbtype}}
@@ -50,7 +49,7 @@ class {{entity.name}}(db.Model):
     {%- endif %}
     {%- endfor %}
 
-    {% if fk_constraints %}
+    {% if fk_constraints -%}
     __table_args__ = (
         {%- for fkc in fk_constraints %}
         db.ForeignKeyConstraint([{{fkc.fk_columns|map(attribute='dbname')|map('quote')|join(", ")}}],
@@ -58,7 +57,7 @@ class {{entity.name}}(db.Model):
                                 name='{{fkc.name}}'),
         {%- endfor %}
     )
-    {% endif %}
+    {% endif -%}
 
 {% endfor %}
 
