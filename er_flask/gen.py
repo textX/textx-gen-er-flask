@@ -27,10 +27,12 @@ def default_dbname(er_name):
     """
 
     tname = er_name[0].upper()
+    last_upper = er_name[0].isupper()
     for letter in er_name[1:]:
-        if letter.isupper():
+        if letter.isupper() and not last_upper:
             tname += "_"
         tname += letter.upper()
+        last_upper = letter.isupper()
     return tname
 
 
