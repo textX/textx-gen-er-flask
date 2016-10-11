@@ -121,14 +121,16 @@ def ent_elements(ent):
                         ForeignKeyConstraint(
                             name="fk_{}_{}".format(dbname(ent), attr.name),
                             fk_columns = cols))
-                elements.append(rel(ent, attr))
+                if cols:
+                    elements.append(rel(ent, attr))
 
     # Add columns and relationships from the direct attributes
     for attr in children_of_type(ent, "Attribute"):
         cols = columns(ent, attr)
         elements.extend(cols)
         if is_entity_ref(attr):
-            elements.append(rel(ent, attr))
+            if cols:
+                elements.append(rel(ent, attr))
             if len(cols) > 1:
                 fk_constraints.append(
                     ForeignKeyConstraint(
