@@ -343,6 +343,7 @@ def render(template_path, context, root_path=None):
     ]))
 
     env.filters['dbname'] = dbname
+    env.filters['pk_attrs'] = pk_attrs
     env.filters['quote'] = quote
     env.filters['ent_elements'] = ent_elements
 

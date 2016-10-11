@@ -44,8 +44,9 @@ class {{entity.name}}(db.Model):
                               {%- if elem.pk %}, primary_key=True{% endif %}
                               {%- if elem.nullable %}, nullable=True{% endif %})
     {%- else %}
-    {{elem.name}} = relationship('{{elem.target_ent.name}}'{% if elem.fk_columns %}, foreign_keys=[
-        {{- elem.fk_columns|map(attribute='name')|join(', ')}}]{% endif %}, backref='{{elem.backref}}')
+    {{elem.name}} = relationship('{{elem.target_ent.name}}',
+                                 {%- if elem.target_ent == entity %} remote_side=[{{entity|pk_attrs|map(attribute='name')|join(", ")}}],{% endif -%}
+                                 {% if elem.fk_columns %} foreign_keys=[{{- elem.fk_columns|map(attribute='name')|join(', ')}}]{% endif %}, backref='{{elem.backref}}')
     {%- endif %}
     {%- endfor %}
 
@@ -66,11 +67,14 @@ class {{entity.name}}(db.Model):
 admin = Admin(app, name='{{project_name}}', template_mode='bootstrap3')
 
 {% for entity in  entities %}
+{%- set elements, fk_constraints = entity|ent_elements -%}
 class {{entity.name}}View(ModelView):
     column_display_pk = True
     form_columns = (
-        {%- for elem in entity|ent_elements %}
+        {%- for elem in elements %}
+        {% if not elem.fk %}
         '{{elem.name}}'{% if not loop.last %},{% endif %}
+        {% endif %}
         {%- endfor %}
     )
 admin.add_view({{entity.name}}View({{entity.name}}, db.session))
