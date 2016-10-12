@@ -1,7 +1,12 @@
 // Default generator param values
-flask_admin = true
 project_name = must_change
+flask_admin = true
+flask_admin_template_mode = bootstrap3
 
+// Generator rules
 Entity:
     for all Enum, Entity as enums, entities
-        "flask.py" => "flaskapp.py"
+        "app.py" => project_name.lower() + ".py"
+        "model.py" => "model.py"
+        "admin.py" => "admin.py"
+
