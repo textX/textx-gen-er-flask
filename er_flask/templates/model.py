@@ -16,7 +16,7 @@ class {{enum.name}}(enum.Enum):
 
 {% endfor %}
 
-{% for entity in entities %}
+{%- for entity in entities %}
 class {{entity.name}}(db.Model):
     __tablename__ = '{{entity|dbname}}'
     {% set elements, fk_constraints = entity|ent_elements -%}
@@ -33,7 +33,8 @@ class {{entity.name}}(db.Model):
     {%- endif %}
     {%- endfor %}
 
-    {% if fk_constraints -%}
+    {%- if fk_constraints %}
+
     __table_args__ = (
         {%- for fkc in fk_constraints %}
         db.ForeignKeyConstraint([{{fkc.fk_columns|map(attribute='dbname')|map('quote')|join(", ")}}],
@@ -41,16 +42,17 @@ class {{entity.name}}(db.Model):
                                 name='{{fkc.name}}'),
         {%- endfor %}
     )
-    {% endif -%}
+    {%- endif -%}
 
     {%- if entity|display %}
+
     def __str__(self):
-        {% set self_list = entity|display|format_list("self.{}") %}
+        {%- set self_list = entity|display|format_list("self.{}") %}
         if {{self_list|join(" and ")}}:
             return {{entity|display|format_list("self.{}")|join(' + ')}}
         else:
             return super({{entity.name}}, self).__str__()
-    {% endif %}
+    {%- endif %}
 
 {% endfor %}
 
