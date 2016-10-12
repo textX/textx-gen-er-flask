@@ -43,5 +43,14 @@ class {{entity.name}}(db.Model):
     )
     {% endif -%}
 
+    {%- if entity|display %}
+    def __str__(self):
+        {% set self_list = entity|display|format_list("self.{}") %}
+        if {{self_list|join(" and ")}}:
+            return {{entity|display|format_list("self.{}")|join(' + ')}}
+        else:
+            return super({{entity.name}}, self).__str__()
+    {% endif %}
+
 {% endfor %}
 

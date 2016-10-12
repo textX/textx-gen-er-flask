@@ -296,6 +296,15 @@ def category(entity):
         return c.parameters[0]
 
 
+def display(entity):
+    d = get_constraint(entity, "display")
+    return d.parameters if d else []
+
+
+def format_list(l, pattern):
+    return [pattern.format(x) for x in l]
+
+
 def validate(model):
     """
     Generator specific validation of ER models.
@@ -352,6 +361,8 @@ def render(template_path, context, root_path=None):
     env.filters['pk_attrs'] = pk_attrs
     env.filters['quote'] = quote
     env.filters['category'] = category
+    env.filters['display'] = display
+    env.filters['format_list'] = format_list
     env.filters['ent_elements'] = ent_elements
 
     return env.get_template(template_path).render(**context)
