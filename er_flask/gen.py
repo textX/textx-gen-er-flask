@@ -290,6 +290,12 @@ def quote(s):
     return "'{}'".format(s)
 
 
+def category(entity):
+    c = get_constraint(entity, "category")
+    if c:
+        return c.parameters[0]
+
+
 def validate(model):
     """
     Generator specific validation of ER models.
@@ -345,6 +351,7 @@ def render(template_path, context, root_path=None):
     env.filters['dbname'] = dbname
     env.filters['pk_attrs'] = pk_attrs
     env.filters['quote'] = quote
+    env.filters['category'] = category
     env.filters['ent_elements'] = ent_elements
 
     return env.get_template(template_path).render(**context)
